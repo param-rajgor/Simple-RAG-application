@@ -3,7 +3,6 @@ RAG (Retrieval-Augmented Generation) Logic
 """
 
 import os
-import shutil
 from dotenv import load_dotenv
 
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
@@ -11,26 +10,19 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 
 from langchain_google_genai import (
-    GoogleGenerativeAIEmbeddings,
     ChatGoogleGenerativeAI,
 )
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
-
 from langchain.chains import RetrievalQA
 
 load_dotenv()
-
-CHROMA_DIR = "./chroma_db"
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 
 def build_index(file_path: str):
-
-    if os.path.exists(CHROMA_DIR):
-        shutil.rmtree(CHROMA_DIR)
 
     # Load document
     if file_path.endswith(".pdf"):
@@ -48,15 +40,15 @@ def build_index(file_path: str):
 
     chunks = splitter.split_documents(documents)
 
-    # Gemini Embeddings
+    # Local Embeddings
     embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
 
+    # In-memory Chroma (works on Streamlit Cloud)
     vectorstore = Chroma.from_documents(
         documents=chunks,
-        embedding=embeddings,
-        persist_directory=CHROMA_DIR
+        embedding=embeddings
     )
 
     retriever = vectorstore.as_retriever(
