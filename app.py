@@ -24,30 +24,41 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-    # Only rebuild the index when a NEW file is uploaded.
-    # The QA chain lives in session_state (not a global) so each browser tab is independent.
-    if "indexed_file" not in st.session_state or st.session_state.indexed_file != uploaded_file.name:
+
+    # Use file content instead of filename
+    file_bytes = uploaded_file.getvalue()
+
+    # Rebuild index only if file content changed
+    if (
+        "indexed_file" not in st.session_state
+        or st.session_state.indexed_file != file_bytes
+    ):
 
         with st.spinner("📚 Reading and indexing your document... (this takes a moment)"):
+
             suffix = ".pdf" if uploaded_file.name.endswith(".pdf") else ".txt"
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(uploaded_file.read())
+                tmp.write(file_bytes)
                 tmp_path = tmp.name
 
             try:
-                # build_index() returns the chain; we store it in session_state
+                # Build fresh index for this uploaded file
                 st.session_state.qa_chain = build_index(tmp_path)
+
+                # Store actual file content signature
+                st.session_state.indexed_file = file_bytes
+
             except Exception as e:
                 st.error(f"❌ Failed to index document: {e}")
                 st.stop()
+
             finally:
-                # Always delete the temp file — even if indexing failed
                 os.unlink(tmp_path)
 
-        st.session_state.indexed_file = uploaded_file.name
         st.success(f"✅ '{uploaded_file.name}' indexed successfully!")
 
-    # --- Question input ---
+    # Question input
     question = st.text_input(
         "💬 Ask a question about your document",
         placeholder="e.g. What is the main topic of this document?",
@@ -55,7 +66,6 @@ if uploaded_file is not None:
 
     if question:
         with st.spinner("🤔 Thinking..."):
-            # Pass the chain from session_state — no global variable needed
             answer = ask(st.session_state.qa_chain, question)
 
         st.write("### 📝 Answer")
